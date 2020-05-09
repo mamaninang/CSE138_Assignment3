@@ -6,7 +6,7 @@
 # Description: 
 ###################
 
-from flask import Flask, request, make_response
+from flask import Flask, request, make_response, jsonify
 import os
 import requests
 app = Flask(__name__)
@@ -19,8 +19,7 @@ vectorClock = {"10.10.0.2": 0, "10.10.0.3":0, "10.10.0.4":0}
 def kvs(key):
 
     #ping other replicas
-    vectorClockJson = json.loads(vectorClock)
-    socketAddress = 
+    #vectorClockJson = json.loads(vectorClock)
 
     if request.method == 'GET':
         return make_response({"doesExist":true,"message":"Retrieved successfully","value":"%s"} % key_value_store[key], 200) \
@@ -29,29 +28,25 @@ def kvs(key):
     if request.method == 'PUT':
         causalMetadata = request.json["causal-metadata"]
 
-
         if causalMetadata is None:
             kvs[key] = request.json
             vectorClock[socketAddress] += 1
-            return make_response('{"message":"Added successfully", "causal-metadata": "{vectorClockJson}"}', 201)
+            return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
         else:
-            if causalMetadata in requestQueue[key]:
+
+            #checks if request in requestQueue has same causal metadata
+            if causalMetadata in requestQueue[key]["causal-metadata"]:     #change this. check each key-value instead
                 kvs[key] = requestQueue[key]
                 del requestQueue[key]
                 vectorClock[socketAddress] += 1
-                return make_response('{"message":"Added successfully", "causal-metadata": "<V2>"}', 201)
+                return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
             else:
                 requestQueue[key] = request.json
-                #do nothing, keep request in requestQueue
 
         #after completing put request, check if any request in requestQueue causally depend on current request
-        if causalMetadata in requestQueue[key] or key not in kvs:
-                kvs[key] = requestQueue[key]
-                del requestQueue[key]
-                return make_response('{"message":"Added successfully", "causal-metadata": "<V2>"}', 201)    
-        #elif key in kvs 
+        checkRequestQueue(key, causalMetadata)
 
-        causalBroadcast()
+        #call broadcast method
 
             
     if request.method == 'DELETE':
@@ -62,34 +57,12 @@ def kvs(key):
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
     
 def checkRequestQueue(key, causalMetadata):
-    if key in requestQueue and causalMetadata is in requestQueue[key]:
-
-
-def causalBroadcast():
-    if forwarding_address is None:
-        #do something
-    else:
-
-        new_address = 'http://' + forwarding_address + request.path
-        res = None
-        timeout = 0.01
-        headers = {"Content-Type": "application/json"}
-
-
-        try:
-            if request.method == 'GET':
-                res = requests.get(new_address, headers=headers, timeout=timeout)
-            
-            if request.method == 'PUT':
-                res = requests.put(new_address, headers=headers, json=request.json, timeout=timeout)
-            
-            if request.method == 'DELETE':
-                res = requests.delete(new_address, headers=headers, timeout=timeout)
-
-        except requests.exceptions.Timeout:
-            return '{"error":"Main instance is down","message":"Error in %s"}' % request.method, 503
-
-        return res.text, res.status_code
+    if key in requestQueue and causalMetadata in requestQueue[key]:
+        kvs[key] = requestQueue[key]
+                del requestQueue[key]
+                vectorClock[socketAddress] += 1
+                return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
+    #elif key in kvs   
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
