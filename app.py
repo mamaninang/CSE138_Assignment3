@@ -28,14 +28,16 @@ def kvs(key):
     if request.method == 'PUT':
         causalMetadata = request.json["causal-metadata"]
 
+
         if causalMetadata is None:
             kvs[key] = request.json
             vectorClock[socketAddress] += 1
+            checkRequestQueue(key, causalMetadata)
             return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
         else:
 
             #checks if request in requestQueue has same causal metadata
-            if causalMetadata in requestQueue[key]["causal-metadata"]:     #change this. check each key-value instead
+            if causalMetadata is requestQueue[key]["causal-metadata"]:     #same as checkRequestQueue??
                 kvs[key] = requestQueue[key]
                 del requestQueue[key]
                 vectorClock[socketAddress] += 1
@@ -44,7 +46,7 @@ def kvs(key):
                 requestQueue[key] = request.json
 
         #after completing put request, check if any request in requestQueue causally depend on current request
-        checkRequestQueue(key, causalMetadata)
+        #checkRequestQueue(key, causalMetadata)
 
         #call broadcast method
 
@@ -59,9 +61,9 @@ def kvs(key):
 def checkRequestQueue(key, causalMetadata):
     if key in requestQueue and causalMetadata in requestQueue[key]:
         kvs[key] = requestQueue[key]
-                del requestQueue[key]
-                vectorClock[socketAddress] += 1
-                return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
+        del requestQueue[key]
+        vectorClock[socketAddress] += 1
+        return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "{vectorClock}"}'), 201)
     #elif key in kvs   
 
 if __name__ == '__main__':
