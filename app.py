@@ -21,7 +21,6 @@ requestQueue = {}
 def kvs(key):
 
     #ping other replicas
-    #vectorClockJson = json.loads(vectorClock)
 
     if request.method == 'GET':
         return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key], 200) \
@@ -31,36 +30,18 @@ def kvs(key):
         causalMetadata = json.loads(json.dumps(request.json["causal-metadata"]))
 
         #if no causal metadata, then complete request right away
-        if causalMetadata == "":
+        if causalMetadata == "" or vectorClock == causalMetadata:
             key_value_store[key] = request.json
             vectorClock[ip] += 1
-            vectorClockJson = json.dumps(vectorClock)
-            checkRequestQueue(key, causalMetadata) 
+            #checkRequestQueue(key, causalMetadata) 
+            #call broadcast method
 
-            return make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % vectorClockJson, 201)
+            return make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % vectorClock, 201)
 
         #if there is metadata, do the following
         else:
-
-            #checks if current vector clock is equal to metadata
-            if vectorClock == causalMetadata:     
-                key_value_store[key] = request.json
-                vectorClock[ip] += 1
-                vectorClockJson = json.dumps(vectorClock)
-                #if requestQueue != {}:
-                    #checkRequestQueue(key, causalMetadata) 
-                
-                vectorType = type(vectorClockJson)
-                return make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % vectorClockJson, 201)
-            else:
-                requestQueue[key] = request.json
-                return make_response('{"message": "The request has been placed in a queue. Waiting for another write"}', 201)
-
-
-        #after completing put request, check if any request in requestQueue causally depend on current request
-        #checkRequestQueue(key, causalMetadata)
-
-        #call broadcast method
+            requestQueue[key] = request.json
+            return make_response('{"message": "Request placed in a queue", "request": "%s"}' % requestQueue[key], 201)
 
             
     if request.method == 'DELETE':
@@ -70,15 +51,24 @@ def kvs(key):
         else: 
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
     
-def checkRequestQueue(key, causalMetadata):
+def checkRequestQueue():
+    address = "http://" + ip + port + "/key-value-store/"
+    headers = {"Content-Type": "application/json"}
 
-    #key in requestQueue and causal-metadata is same as current clock, store request in kvs
-    if key in requestQueue and (requestQueue[key]["causal-metadata"] == vectorClock):
-        kvs[key] = requestQueue[key]
-        del requestQueue[key]
-        vectorClock[socketAddress] += 1
-        return make_response(jsonify('{"message":"Added successfully", "causal-metadata": "%s"}' %vectorClockJson), 201)
-    #elif key in kvs   
+    if request.method == 'PUT':
+        for key in requestQueue:
+            if requestQueue[key]["causal-metadata"] == vectorClock:
+                address += key
+                value = requestQueue[key]
+    
+        return requests.put(address, headers=headers, json=value)
+
+
+def isLessOrSameVC(causalMetadata):
+    for key in vectorClock:
+        if causalMetadata[key] > vectorClock[key]:
+            return False
+    return True
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
