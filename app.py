@@ -12,8 +12,6 @@ import requests
 import json, time
 app = Flask(__name__)
 
-app.secret_key = "LandB4Time"
-
 key_value_store = {}
 socketAddress = os.getenv('SOCKET_ADDRESS')
 myIP, port = os.getenv('SOCKET_ADDRESS').split(':')[0], os.getenv('SOCKET_ADDRESS').split(':')[1]
@@ -81,11 +79,10 @@ def checkRequestQueue():
         for key in requestQueue:
 
             if requestQueue[key]["causal-metadata"] == vectorClock:
-                key_value_store[key] = req
+                key_value_store[key] = requestQueue[key]
                 vectorClock[myIP] += 1
                 #url = "http://" + request.host +":8085"
                 del requestQueue[key]
-                time.sleep(2)
         
         #reqAfter = requestQueue
         return '{"message":"in checkRequestQueue", "vector":"%s"}' % (json.dumps(vectorClock))
