@@ -50,7 +50,7 @@ def kvs(key):
                 response = checkRequestQueue()
 
                 return  response if response is not None \
-                    else make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % (json.dumps(vectorClock)), 201) if response is None \
+                    else make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % (json.dumps(vectorClock)), 201)
 
             #call broadcast method
             return make_response('{"message":"Added successfully", "causal-metadata": "%s"}' % json.dumps(vectorClock), 201)
@@ -83,9 +83,10 @@ def checkRequestQueue():
                 vectorClock[myIP] += 1
                 #url = "http://" + request.host +":8085"
                 del requestQueue[key]
+                return '{"message":"in checkRequestQueue", "vector":"%s"}' % (json.dumps(vectorClock))
         
         #reqAfter = requestQueue
-        return '{"message":"in checkRequestQueue", "vector":"%s"}' % (json.dumps(vectorClock))
+        
 
 
 if __name__ == '__main__':
