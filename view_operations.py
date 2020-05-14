@@ -3,59 +3,50 @@ import requests
 import os
 app = Flask(__name__)
 
-# view = os.getenv('VIEW')
-# view_list = view.split(",");
-view = ["10.10.0.2:8085","10.10.0.3:8085","10.10.0.4:8085"]
-request_address = os.getenv('SOCKET_ADDRESS')
 headers = {"Content-Type": "application/json"}
 
 @app.route('/key-value-store-view', methods=['GET', 'PUT', 'DELETE'])
 def view_operations():
-    if request_address is None:
-        if request.method == 'GET':
-            return {"message":"View retrieved succesfully",'view':view}, 200
+    replica_view = os.getenv('VIEW')
+    view_list = replica_view.split(",")
 
-        elif request.method == 'PUT':
-            address_to_be_added = request.json["socket-address"]
-            if address_to_be_added in view:
-                return {"error":"Socket address already exists in the view", "message":"Error in PUT"}, 404
-            else:
-                view.append(',' + address_to_be_added)
+    if request.method == 'GET':
+        return {"message":"View retrieved succesfully","view":replica_view}, 200
 
-                for ip in view:
-                    address_to_search = 'http://' + ip + '/key-value-store-view'
-                    checking_ips_view = requests.get(address_to_search, headers=headers)
-                    if address_to_be_added not in checking_ips_view.view:
-                        request.put(address_to_search, headers=headers, data={"socket-address":address_to_be_added})
+    elif request.method == 'PUT':
+        address_to_be_added = request.args['socket-address']
 
-                return {"message":"Replica added successfully to the view"}, 201
-                
-        
-        elif request.method == 'DELETE':
-            address_to_delete = request.json['socket-address']
-            if address_to_delete not in view:
-                return {"error":"Socket address does not exist in the view","message":"Error in DELETE"}, 404
-            else:
-                view.remove(address_to_delete)
+        if address_to_be_added in view_list:
+            return {"error":"Socket address already exists in the view", "message":"Error in PUT"}, 404
 
-                for ip in view:
-                    address_to_search = "http://" + ip + 'key-value-store-view'
-                    checking_ips_view = request.get(address_to_delete, headers=headers)
-                    if address_to_delete in checking_ips_view.view:
-                        request.put(address_to_search, headers=headers, data={'socket-address': address_to_delete})
-                return {"message":"Replica deleted successfully from the view"}, 200
+        else:
+            hold = replica_view + "," + address_to_be_added
+            os.environ['VIEW'] = hold
 
-    else:
-        response_address = 'http://' + request_address + "/key-value-store-view"
+            for ip in view_list:
+                address_to_search = 'http://' + ip + '/key-value-store-view'
+                checking_ips_view = requests.get(address_to_search, headers=headers)
+                if address_to_be_added not in checking_ips_view.view:
+                    request.put(address_to_search, headers=headers, data={"socket-address":address_to_be_added})
 
-        if request.method == 'GET':
-            return requests.get(response_address, headers=headers)
-        
-        elif request.method == 'PUT':
-            return request.put(request_address, headers=headers)
+            return {"message":"Replica added successfully to the view"}, 201
+            
+    
+    elif request.method == 'DELETE':
+        address_to_delete = request.args['socket-address']
+        if address_to_delete not in view_list:
+            return {"error":"Socket address does not exist in the view","message":"Error in DELETE"}, 404
+        else:
+            view_list.remove(address_to_delete)
+            new_env = ",".join(view_list)
+            os.environ['VIEW'] = new_env
 
-        elif request.method == 'DELETE':
-            return request.delete(request_address, headers=headers)
+            # for ip in view:
+            #     address_to_search = "http://" + ip + 'key-value-store-view'
+            #     checking_ips_view = request.get(address_to_delete, headers=headers)
+            #     if address_to_delete in checking_ips_view.view:
+            #         request.put(address_to_search, headers=headers, data={'socket-address': address_to_delete})
+            return {"message":"Replica deleted successfully from the view"}, 200
 
 if __name__=='__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
