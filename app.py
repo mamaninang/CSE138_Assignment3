@@ -13,8 +13,7 @@ import json, time
 app = Flask(__name__)
 
 key_value_store = {}
-socketAddress = os.getenv('SOCKET_ADDRESS')
-myIP, port = os.getenv('SOCKET_ADDRESS').split(':')[0], os.getenv('SOCKET_ADDRESS').split(':')[1]
+myIP = os.getenv('SOCKET_ADDRESS').split(':')[0]
 vectorClock = {"10.10.0.2": 0, "10.10.0.3":0, "10.10.0.4":0}
 requestQueue = {}
 
@@ -34,11 +33,10 @@ def kvs(key):
         if causal == "" or causal[myIP] <= vectorClock[myIP]:
 
             successMsg = "Updated successfully" if key in key_value_store else "Added successfully"
-
             key_value_store[key] = request.json
             
             #takes max value of each element and adds 1 to own position
-            if causal != "":
+            if causal != "":    
                 compareVC(causal)
             vectorClock[myIP] += 1
             
@@ -49,26 +47,27 @@ def kvs(key):
                     response = checkRequestQueue()
 
             #if request is from client, broadcast the request here
-            
-            return make_response('{"message":"%s", "causal-metadata": %s}' % (successMsg, json.dumps(vectorClock)), 201)
+
+            vectorClockJson = json.dumps(vectorClock)
+            return make_response('{"message":"%s", "causal-metadata": %s}' % (successMsg, vectorClockJson), 201)
 
         else:
 
             requestQueue[key] = request.json
-            requestQueue[key]["method"] = 'PUT'
+            requestQueue[key]["method"] = request.method
             return ('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
 
             
     if request.method == 'DELETE':
         causal = request.json["causal-metadata"]
 
-        if causal[myIP] > vectorClock[myIP]:
-            requestQueue[key] = request.json
-            requestQueue[key]["method"] = 'DELETE'
-            return make_response('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
-
-        elif key not in key_value_store:
+        if key not in key_value_store:
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
+
+        elif causal[myIP] > vectorClock[myIP]:
+            requestQueue[key] = request.json
+            requestQueue[key]["method"] = request.method
+            return make_response('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
 
         elif key_value_store[key] is None:
             return make_response('{"doesExist":false,"error":"Key already deleted","message":"Error in DELETE"}', 404)
@@ -77,7 +76,7 @@ def kvs(key):
             key_value_store[key] = None
 
             #takes max value of each element and adds 1 to own position
-            if causal != "":
+            if causal != "":    
                 compareVC(causal)
             vectorClock[myIP] += 1
 
@@ -89,7 +88,8 @@ def kvs(key):
             
             #if request is from client, broadcast the request here
 
-            return make_response('{"doesExist":true,"message":"Deleted successfully", "causal-metadata":"%s"}' % json.dumps(vectorClock), 200) 
+            vectorClockJson = json.dumps(vectorClock)
+            return make_response('{"doesExist":true,"message":"Deleted successfully", "causal-metadata":"%s"}' % vectorClockJson, 200) 
 
     
 def checkRequestQueue():
@@ -98,8 +98,6 @@ def checkRequestQueue():
     for key in requestQueue:
 
         causal = requestQueue[key]["causal-metadata"]
-
-        #EDIT THIS. execute block of code if vectorClock[myIP] >= causal[myIP] 
         if causal[myIP] <= vectorClock[myIP]:
 
             if requestQueue[key]["method"] == 'PUT':
@@ -110,7 +108,6 @@ def checkRequestQueue():
 
             del requestQueue[key]
             vectorClock[myIP] += 1
-            #url = "http://" + request.host +":8085"
             return 'Not done checking request queue'
     
     return None
