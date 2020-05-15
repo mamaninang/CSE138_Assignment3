@@ -1,14 +1,26 @@
 from flask import Flask, request, make_response
 import requests
 import os
+import json
 app = Flask(__name__)
 
 headers = {"Content-Type": "application/json"}
+
+@app.route('/key-value-store-view/put', methods=['PUT'])
+def broadcast_put():
+    if request.method == 'PUT':
+        replica_view = os.getenv('VIEW')
+        address_to_be_added = request.args['socket-address']
+        updated_view = replica_view + "," + address_to_be_added
+        os.environ['VIEW'] = updated_view
+        
+        return {"message":"Replica added successfully to the view"}, 201
 
 @app.route('/key-value-store-view', methods=['GET', 'PUT', 'DELETE'])
 def view_operations():
     replica_view = os.getenv('VIEW')
     view_list = replica_view.split(",")
+    socket_address = os.getenv("SOCKET_ADDRESS")
 
     if request.method == 'GET':
         return {"message":"View retrieved succesfully","view":replica_view}, 200
@@ -20,14 +32,19 @@ def view_operations():
             return {"error":"Socket address already exists in the view", "message":"Error in PUT"}, 404
 
         else:
-            hold = replica_view + "," + address_to_be_added
-            os.environ['VIEW'] = hold
+            updated_view = replica_view + "," + address_to_be_added
+            os.environ['VIEW'] = updated_view
+            replica_view = os.getenv('VIEW')
 
             for ip in view_list:
-                address_to_search = 'http://' + ip + '/key-value-store-view'
-                checking_ips_view = requests.get(address_to_search, headers=headers)
-                if address_to_be_added not in checking_ips_view.view:
-                    request.put(address_to_search, headers=headers, data={"socket-address":address_to_be_added})
+                if ip != socket_address:
+                    address_to_search = 'http://' + ip + '/key-value-store-view'
+                    response = requests.get(address_to_search, headers=headers)
+                    response_json = response.json()
+                    response_view = response_json['view']
+                    if response_view != replica_view:
+                        address_to_search = address_to_search + "/put?socket-address=" + address_to_be_added
+                        requests.put(address_to_search, headers=headers, json=request.json)
 
             return {"message":"Replica added successfully to the view"}, 201
             
@@ -47,6 +64,7 @@ def view_operations():
             #     if address_to_delete in checking_ips_view.view:
             #         request.put(address_to_search, headers=headers, data={'socket-address': address_to_delete})
             return {"message":"Replica deleted successfully from the view"}, 200
+
 
 if __name__=='__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
