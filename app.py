@@ -31,7 +31,7 @@ def kvs(key):
     if request.method == 'PUT':
         causal = request.json["causal-metadata"]
 
-        if causal == "" or vectorClock[myIP] >= causal[myIP]:
+        if causal == "" or causal[myIP] <= vectorClock[myIP]:
 
             successMsg = "Updated successfully" if key in key_value_store else "Added successfully"
 
@@ -42,7 +42,6 @@ def kvs(key):
                 compareVC(causal)
             vectorClock[myIP] += 1
             
-
             #check requests on hold
             response = True
             if requestQueue != {}:
@@ -63,16 +62,16 @@ def kvs(key):
     if request.method == 'DELETE':
         causal = request.json["causal-metadata"]
 
-        if key not in key_value_store:
-            return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
-
-        if key_value_store[key] is None:
-            return make_response('{"doesExist":false,"error":"Key already deleted","message":"Error in DELETE"}', 404)
-        
-        elif vectorClock[myIP] < causal[myIP]:
+        if causal[myIP] > vectorClock[myIP]:
             requestQueue[key] = request.json
             requestQueue[key]["method"] = 'DELETE'
             return make_response('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
+
+        elif key not in key_value_store:
+            return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
+
+        elif key_value_store[key] is None:
+            return make_response('{"doesExist":false,"error":"Key already deleted","message":"Error in DELETE"}', 404)
 
         else:
             key_value_store[key] = None
@@ -98,8 +97,10 @@ def checkRequestQueue():
 
     for key in requestQueue:
 
+        causal = requestQueue[key]["causal-metadata"]
+
         #EDIT THIS. execute block of code if vectorClock[myIP] >= causal[myIP] 
-        if requestQueue[key]["causal-metadata"] == vectorClock:
+        if causal[myIP] <= vectorClock[myIP]:
 
             if requestQueue[key]["method"] == 'PUT':
                 key_value_store[key] = requestQueue[key]
@@ -113,6 +114,7 @@ def checkRequestQueue():
             return 'Not done checking request queue'
     
     return None
+    
 
 def compareVC(causal):
     for ip in vectorClock:
