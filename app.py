@@ -19,47 +19,76 @@ requestQueue = {}
 
 @app.route('/key-value-store/<key>', methods=['GET','PUT','DELETE'])
 def kvs(key):
-    defaultlInternalIP = "127.0.0.1"
-
+    #view = getView()
+    #def updateKVS(view)
+    #for ip in vectorClock:
+    #   if ip not in view:
+    #       vectorClock[ip] = None
+    #   elif ip in view and vectorClock[ip] == None:
+    #       vectorClock[ip] = 0
     ##get view of active replicas then update vectorClock here
+
+    causal = request.json["causal-metadata"]
+    sender = request.remote_addr
+
 
     if request.method == 'GET':
         return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key], 200) \
             if key in key_value_store else make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
 
     if request.method == 'PUT':
-        causal = request.json["causal-metadata"]
 
-        if causal == "" or causal[myIP] <= vectorClock[myIP]:
+        if key in key_value_store:
+            successMsg, statusCode = "Updated successfully", 200
+        else:
+            successMsg, statusCode = "Added successfully", 201
 
-            successMsg = "Updated successfully" if key in key_value_store else "Added successfully"
+        if causal == "":
+
             key_value_store[key] = request.json
-            
-            #takes max value of each element and adds 1 to own position
-            if causal != "":    
-                compareVC(causal)
             vectorClock[myIP] += 1
-            
-            #check requests on hold
-            response = True
-            if requestQueue != {}:
-                while response is not None:
-                    response = checkRequestQueue()
 
-            #if request is from client, broadcast the request here
+            #check requests on hold
+            if requestQueue != {}:
+                done = False
+                while done is not True:
+                    done = checkRequestQueue()
+
+            broadcast(sender)
 
             vectorClockJson = json.dumps(vectorClock)
-            return make_response('{"message":"%s", "causal-metadata": %s}' % (successMsg, vectorClockJson), 201)
+            return make_response('{"message":"%s", "causal-metadata": %s}' % (successMsg, vectorClockJson), statusCode)
 
         else:
 
-            requestQueue[key] = request.json
-            requestQueue[key]["method"] = request.method
-            return ('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
+            if causal[myIP] > vectorClock[myIP]:
+                requestQueue[key] = request.json
+                requestQueue[key]["method"] = request.method
+                return ('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
+
+            else:
+
+                key_value_store[key] = request.json
+
+                if sender not in vectorClock:
+                    vectorClock[myIP] += 1
+                else:
+                    takeMaxElement(causal)
+                    vectorClock[myIP] += 1
+
+                #check requests on hold
+                if requestQueue != {}:
+                    done = False
+                    while done is not True:
+                        done = checkRequestQueue()
+
+                broadcast(sender)
+
+                vectorClockJson = json.dumps(vectorClock)
+                return make_response('{"message":"%s", "causal-metadata": %s}' % (successMsg, vectorClockJson), statusCode)
 
             
     if request.method == 'DELETE':
-        causal = request.json["causal-metadata"]
 
         if key not in key_value_store:
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
@@ -77,23 +106,22 @@ def kvs(key):
 
             #takes max value of each element and adds 1 to own position
             if causal != "":    
-                compareVC(causal)
+                takeMaxElement(causal)
             vectorClock[myIP] += 1
 
             #check requests on hold
-            response = True
             if requestQueue != {}:
-                while response is not None:
-                    response = checkRequestQueue()
-            
-            #if request is from client, broadcast the request here
+                done = False
+                while done is not True:
+                    done = checkRequestQueue()
+
+            broadcast(sender)
 
             vectorClockJson = json.dumps(vectorClock)
             return make_response('{"doesExist":true,"message":"Deleted successfully", "causal-metadata":"%s"}' % vectorClockJson, 200) 
 
     
 def checkRequestQueue():
-    headers = {"Content-Type": "application/json"}
 
     for key in requestQueue:
 
@@ -108,15 +136,36 @@ def checkRequestQueue():
 
             del requestQueue[key]
             vectorClock[myIP] += 1
-            return 'Not done checking request queue'
-    
-    return None
+            return False
+        
+    return True
     
 
-def compareVC(causal):
+def takeMaxElement(causal):
     for ip in vectorClock:
         if causal[ip] > vectorClock[ip]:
             vectorClock[ip] = causal[ip]
+    
+        
+
+def broadcast(sender):
+
+    #if sender is not a replica, broadcast
+    if sender not in vectorClock:
+        for ip in vectorClock:
+            if ip != myIP:
+
+                causalJson = request.json
+                address = "http://" + ip + ":8085" + request.path
+                causalJson["causal-metadata"] = vectorClock
+
+                if request.method == 'PUT':
+                    requests.put(address, headers=request.headers, json=causalJson)
+
+                if request.method == 'DELETE':
+                    requests.delete(address, headers=request.headers, json=causalJson)
+        
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
