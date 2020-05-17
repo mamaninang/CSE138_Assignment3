@@ -1,3 +1,19 @@
+####################
+# Course: CSE138
+# Date: Spring 2020
+# Author: Omar Quinones
+# Assignment: 3
+# Description: This file holds the operations GET, PUT, and DELETE for the key-value-store-view endpoint.
+#              If a GET request is made it will return the view of that given replica.
+#              If a PUT request is made and the socket address doesn't already exist in the view
+#              then the given replica will update it's view and then broadcast a message to update
+#              all the other replicas. Otherwise if the socket-address already exists a 404 bad request will
+#              be returned. 
+#              If a DELETE request is made and the socket-address does exist in the replicas view then it will update
+#              the given replicas view. Then it will broadcast a delete to all the other given replicas.
+#              Otherwise, if the socket-address doesn't exists a 404 bad request will be returned.
+###################
+
 from flask import Flask, request, make_response
 import requests
 import os
@@ -6,6 +22,7 @@ app = Flask(__name__)
 
 headers = {"Content-Type": "application/json"}
 
+#Function to add a replica to the view of the given replica
 @app.route('/key-value-store-view/put', methods=['PUT'])
 def broadcast_put():
     if request.method == 'PUT':
@@ -16,6 +33,7 @@ def broadcast_put():
         
         return {"message":"Replica added successfully to the view"}, 201
 
+#Function to delete a replica from the view of the given replica
 @app.route('/key-value-store-view/del', methods=['DELETE'])
 def brodcast_del():
     if request.method == 'DELETE':
@@ -28,7 +46,8 @@ def brodcast_del():
 
         return {"message":"Replica deleted successfully from the view"}, 200
 
-
+#Function to check what request is being made and update the given replica
+#and calls the brodcast functions for PUT and DELETE
 @app.route('/key-value-store-view', methods=['GET', 'PUT', 'DELETE'])
 def view_operations():
     replica_view = os.getenv('VIEW')
@@ -42,7 +61,7 @@ def view_operations():
         address_to_be_added = request.args['socket-address']
 
         if address_to_be_added in view_list:
-            return {"error":"Socket address already exists in the view", "message":"Error in PUT"}, 404
+            return {"error":"Socket address already exists in the view","message":"Error in PUT"}, 404
 
         else:
             updated_view = replica_view + "," + address_to_be_added
@@ -81,6 +100,7 @@ def view_operations():
 
             return {"message":"Replica deleted successfully from the view"}, 200
 
+#Function to get other replicas view and returns the new address to brodcast messages
 def get_view(ip_address):
     address_to_search = 'http://' + ip_address + '/key-value-store-view'
     response = requests.get(address_to_search, headers=headers)
