@@ -19,19 +19,13 @@ requestQueue = {}
 
 @app.route('/key-value-store/<key>', methods=['GET','PUT','DELETE'])
 def kvs(key):
-    #view = requests.get("http://" + myIP + ":8085/key-value-store-view/", headers=request.headers)
-    #def updateKVS(view)
-    #for ip in vectorClock:
-    #   if ip not in view:
-    #       vectorClock[ip] = None
-    #   elif ip in view and vectorClock[ip] == None:
-    #       vectorClock[ip] = 0
-    ##get view of active replicas then update vectorClock here
-
 
     if request.method == 'GET':
-        return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key], 200) \
-            if key in key_value_store else make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
+        
+        if key_value_store[key] is None or key not in key_value_store:
+            return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
+        else:
+            return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key]["value"], 200)
 
     if request.method == 'PUT':
         causal = request.json["causal-metadata"]
