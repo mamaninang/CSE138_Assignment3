@@ -28,14 +28,19 @@ def kvs(key):
     #       vectorClock[ip] = 0
     ##get view of active replicas then update vectorClock here
 
+    causal = request.json["causal-metadata"]
+    sender = request.remote_addr
+    value = request.json
 
     if request.method == 'GET':
-        return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key], 200) \
-            if key in key_value_store else make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
+        
+        if key_value_store[key] is None or key not in key_value_store:
+            return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
+        else:
+            return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key]["value"], 200)
+
 
     if request.method == 'PUT':
-        causal = request.json["causal-metadata"]
-        sender = request.remote_addr
 
         keyAlreadyExists = True if key in key_value_store else False
 
@@ -60,7 +65,8 @@ def kvs(key):
                 else:
                     takeMaxElement(causal)
                     vectorClock[myIP] += 1
-                
+
+        broadcast(sender, key, value, request.method)
 
         #check requests on hold
         if requestQueue != {}:
@@ -68,20 +74,14 @@ def kvs(key):
             while done is not True:
                 done = checkRequestQueue()
 
-        #broadcast to other replicas
-        if sender not in vectorClock:
-            broadcast(sender)
-
         vectorClockJson = json.dumps(vectorClock)
         if keyAlreadyExists ==  True:
-            return make_response('{"message":"Updated successfully", "causal-metadata": %s}' % json.dumps(vectorClock), 200)
+            return make_response('{"message":"Updated successfully", "causal-metadata": %s}' % vectorClockJson, 200)
         else:
-            return make_response('{"message":"Added successfully", "causal-metadata": %s}' % json.dumps(vectorClock), 201)
+            return make_response('{"message":"Added successfully", "causal-metadata": %s}' % vectorClockJson, 201)
 
             
     if request.method == 'DELETE':
-        causal = request.json["causal-metadata"]
-        sender = request.remote_addr
 
         if key not in key_value_store:
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
@@ -103,6 +103,8 @@ def kvs(key):
             else:
                 takeMaxElement(causal)
                 vectorClock[myIP] += 1
+            
+            broadcast(sender, key, value, request.method)
 
             #check requests on hold
             if requestQueue != {}:
@@ -110,10 +112,8 @@ def kvs(key):
                 while done is not True:
                     done = checkRequestQueue()
 
-            broadcast(sender)
-
             vectorClockJson = json.dumps(vectorClock)
-            return make_response('{"doesExist":true,"message":"Deleted successfully", "causal-metadata":"%s"}' % vectorClockJson, 200) 
+            return make_response('{"message":"Deleted successfully", "causal-metadata":%s}' % vectorClockJson, 200) 
 
     
 def checkRequestQueue():
@@ -125,12 +125,19 @@ def checkRequestQueue():
 
             if requestQueue[key]["method"] == 'PUT':
                 key_value_store[key] = requestQueue[key]
+                method = 'PUT'
 
             elif requestQueue[key]["method"] == 'DELETE':
                 key_value_store[key] = None
+                method = 'DELETE'
+
+            sender = request.method
+            value = key_value_store[key]
 
             del requestQueue[key]
             vectorClock[myIP] += 1
+            broadcast(sender, key, value, method)
+
             return False
         
     return True
@@ -140,26 +147,28 @@ def takeMaxElement(causal):
     for ip in vectorClock:
         if causal[ip] > vectorClock[ip]:
             vectorClock[ip] = causal[ip]
-    
         
 
-def broadcast(sender):
+def broadcast(sender, key, value, method):
+    
 
     #if sender is not a replica, broadcast
     if sender not in vectorClock:
         for ip in vectorClock:
             if ip != myIP:
 
-                causalJson = request.json
-                address = "http://" + ip + ":8085" + request.path
-                causalJson["causal-metadata"] = vectorClock
+                address = "http://" + ip + ":8085/key-value-store/" + key
+                value["causal-metadata"] = vectorClock
 
-                if request.method == 'PUT':
-                    res = requests.put(address, headers=request.headers, json=causalJson)
+                if method == 'PUT':
+                    response = requests.put(address, headers=request.headers, json=value)
 
-                if request.method == 'DELETE':
-                    res = requests.delete(address, headers=request.headers, json=causalJson)
-    
+                elif method == 'DELETE':
+                    response = requests.delete(address, headers=request.headers, json=value)
+
+                responseJson = response.json()
+                newVector = responseJson["causal-metadata"]
+                takeMaxElement(newVector)
 
 
 
