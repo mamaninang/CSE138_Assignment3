@@ -20,6 +20,8 @@ WORKDIR /app
 
 RUN pip install -r requirements.txt
 
+EXPOSE 8085
+
 ENTRYPOINT [ "python3" ]
 
 CMD [ "app.py" ]
