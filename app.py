@@ -25,7 +25,7 @@ def kvs(key):
         if key_value_store[key] is None or key not in key_value_store:
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in GET"}', 404)
         else:
-            return make_response('{"doesExist":true,"message":"Retrieved successfully","value":"%s"}' % key_value_store[key]["value"], 200)
+            return make_response('{"doesExist":true,"message":"Retrieved successfully","casual-metadata":"%s"}' % key_value_store[key]["causal-metadata"], 200)
 
     if request.method == 'PUT':
         causal = request.json["causal-metadata"]
