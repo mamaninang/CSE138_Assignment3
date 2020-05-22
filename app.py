@@ -5,12 +5,12 @@ import json, time
 import sys
 app = Flask(__name__)
 
-#socket_address = os.getenv('SOCKET_ADDRESS')
-socket_address = "10.10.0.2:8085"
+socket_address = os.getenv('SOCKET_ADDRESS')
+#socket_address = "10.10.0.2:8085"
 myIP = socket_address.split(':')[0]
 
-#viewVar = os.getenv('VIEW')
-viewVar = "10.10.0.2:8085,10.10.0.3:8085,10.10.0.4:8085"
+viewVar = os.getenv('VIEW')
+#viewVar = "10.10.0.2:8085,10.10.0.3:8085,10.10.0.4:8085"
 view = viewVar.split(',')
 
 key_value_store = {}
@@ -30,7 +30,7 @@ def kvs(key):
         if key not in key_value_store or key_value_store[key] is None:
             return make_response('{"message":"Key does not exist"}', 404)
         else:
-            return make_response('"message":"Retrieved successfully", "casual-metadata":"%s", "value":"%s"}' % (key_value_store[key]["causal-metadata"], key_value_store[key]["value"]), 200)
+            return make_response('{"message":"Retrieved successfully", "casual-metadata":"%s", "value":"%s"}' % (key_value_store[key]["causal-metadata"], key_value_store[key]["value"]), 200)
 
     if request.method == 'PUT':
         causal = request.json["causal-metadata"]
@@ -147,7 +147,7 @@ def takeMaxElement(causal):
 @app.route('/key-value-store-view', methods=['GET', 'PUT', 'DELETE'])
 def view_operations():
     if request.method == 'GET':
-        return {"message":"View retrieved succesfully","view":view}, 200
+        return {"message":"View retrieved succesfully","view":",".join(view)}, 200
 
     elif request.method == 'PUT':
         address_to_be_added = request.json['socket-address']
