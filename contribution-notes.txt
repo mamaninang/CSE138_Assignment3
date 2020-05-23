@@ -1,0 +1,5 @@
+Omar Quinones -- Implemented View Operations
+Alan Vasilkovsky -- Implemented Broadcasting Function 
+Mariah Maninang -- Implemented PUT & Delete for key-value-store
+Bradley Gallardo -- Implmeneted GET for key-value-store
+Everyone: Worked on debugging 
