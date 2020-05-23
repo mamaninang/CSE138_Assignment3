@@ -1,0 +1,13 @@
+Replica Detection:
+    In order to detect a replica that is down, we set a timeout on every HTTP request that is made during a replica's broadcast.
+
+    If a broadcasted request times out, then we know that the replica which the broadcast was sent to is down.
+
+    Then, we can delete that replica from the view and broadcast a DELETE request to the /key-value-store-view endpoint.
+
+Causal Dependency Tracking:
+    In order to track causal dependency, we use vector clocks.
+
+    If a request to a replica's /key-value-store/<key> endpoint comes in has a vector clock which does not match the current vector clock, we put it in the queue until the previous casually dependent requests are satisfied.
+
+    When a replica connects to the subnet, it queries the replicas that are up to get the most recent values for the key value store and vector clock.
