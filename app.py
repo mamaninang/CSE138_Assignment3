@@ -27,17 +27,23 @@ def view_operations():
     global view
 
     if request.method == 'GET':
+        old_view = view
+        sender = request.remote_addr + ":8085"
         broadcast(request)
+
         return make_response('{"message":"View retrieved succesfully","view":%s}' % json.dumps(view), 200)
 
 
     elif request.method == 'PUT':
+        sender = request.remote_addr + ":8085"
+
         address_to_be_added = request.json['socket-address']
 
         if address_to_be_added in view:
             return {"error":"Socket address already exists in the view","message":"Error in PUT"}, 404
 
         else:
+            
             view.append(address_to_be_added)
 
             if request.remote_addr not in [ip.split(':')[0] for ip in view]:
@@ -78,6 +84,7 @@ def broadcast(request):
                 res = requests.get('http://{}/status'.format(ip), headers = request.headers, timeout=1).json()
                 if res is not None and ip not in view:
                     view.append(ip)
+                    # send_missed_requests()
 
             except requests.exceptions.Timeout:
                 if ip in view:
@@ -90,19 +97,20 @@ def broadcast(request):
             #if ip is not in view and is not own ip, delete address
             addresses_to_delete = [ip for ip in broadcast_range if ip not in view]
 
-            #broadcast to all addresses in view except own ip
+            #broadcast range is all addresses in current view except own ip
             del_broadcast_range = [ip for ip in broadcast_range if ip in view]
 
-            #deletes inactive replicas from other replicas' views
+            #delete inactive replicas from other replicas' views
             for replica in del_broadcast_range:
                 for ip in addresses_to_delete:
                     requests.delete('http://{}/key-value-store-view'.format(replica), json={"socket-address": ip})
 
-            #puts additional active replicas to other replicas' views
+            #put additional active replicas to other replicas' views
             put_broadcast_range = [ip for ip in view if ip != socket_address]
             for replica in put_broadcast_range:
                 for ip in view:
-                    requests.put('http://{}/key-value-store-view'.format(replica), json={"socket-address": ip})
+                    res = requests.put('http://{}/key-value-store-view'.format(replica), json={"socket-address": ip})
+            
 
 
     elif request.method == 'PUT' and request.json is not None:
@@ -142,13 +150,15 @@ def broadcast(request):
 @app.route('/key-value-store/<key>', methods=['GET','PUT','DELETE'])
 def kvs(key):
     global view
+    global key_value_store
+
 
     sender = request.remote_addr + ":8085"
 
     if sender not in vectorClock:
         res = requests.get('http://{}/key-value-store-view'.format(myIP), headers = request.headers).json()
         view = res["view"]
-
+        
 
     if request.method == 'GET':
 
@@ -159,6 +169,7 @@ def kvs(key):
             causal = json.dumps(key_value_store[key]["causal-metadata"])
             value = key_value_store[key]["value"]
             return make_response('{"message":"Retrieved successfully", "causal-metadata":%s, "value":"%s"}' % (causal, value), 200)
+  
 
 
     if request.method == 'PUT':
@@ -198,6 +209,7 @@ def kvs(key):
 
                 key_value_store[key] = request.json
 
+                #takes max value of each element if sender is a replica and adds 1 to own position
                 if sender not in vectorClock:
                     vectorClock[myIP] += 1
                 else:
@@ -235,10 +247,12 @@ def kvs(key):
         else:
             key_value_store[key] = None
 
-            #takes max value of each element and adds 1 to own position
-            if causal != "":    
+            #takes max value of each element if sender is a replica and adds 1 to own position
+            if sender not in vectorClock:
+                vectorClock[myIP] += 1
+            else:
                 takeMaxElement(causal)
-            vectorClock[myIP] += 1
+                vectorClock[myIP] += 1
 
             #check requests on hold
             if requestQueue != {}:
@@ -295,7 +309,7 @@ def kvs_broadcast(sender, key, value, method):
         for ip in broadcast_range:
 
             address = "http://" + ip + "/key-value-store/" + key
-            value["causal-metadata"] = vectorClock
+            value["causal-metadata"] = key_value_store[key]["causal-metadata"]
 
             if method == 'PUT':
                 response = requests.put(address, headers=request.headers, json=value)
@@ -307,9 +321,33 @@ def kvs_broadcast(sender, key, value, method):
             newVector = responseJson["causal-metadata"]
             takeMaxElement(newVector)
 
+
+
 @app.route('/status', methods = ['GET'])
 def status():
+    global view
+
     return make_response('{"status": "alive"}')
+
+# @app.route('/get-vc', methods = ['GET'])
+#     return {"vector-clock": json.dumps(vectorClock)}
+
+# @app.route('/update-kvs', methods = ['PUT'])
+# def update_kvs():
+#     global key_value_store
+
+#     key_value_store = request.json["key-value-store"]
+
+@app.route('/wake', methods=['GET'])
+def wake():
+    return key_value_store, 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8085)
+    for ip in [i for i in view if i is not socket_address]:
+        try:
+            key_value_store = requests.get('http://%s/wake' % ip, timeout=1)[0]
+            break
+        except requests.exceptions.Timeout:
+            continue
+    
