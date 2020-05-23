@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 Omar Quinones     - Implemented the GET, PUT, and DELETE functions for the view operations  (lines )
 Alan Vasilkovsky  - Implemented the broadcast method for the view operations (lines)
@@ -5,3 +6,10 @@ Bradley Gallardo  - Implemented the GET function for the key-value-store operati
 Mariah Maninang   - Implemented the PUT and DELETE functions, and the supporting methods for the key-value-store operations (lines )
 
 All the members of the group worked together as well to debug and fix the errors for this assignment
+=======
+Omar Quinones -- Implemented View Operations
+Alan Vasilkovsky -- Implemented Broadcasting Function 
+Mariah Maninang -- Implemented PUT & Delete for key-value-store
+Bradley Gallardo -- Implmeneted GET for key-value-store
+Everyone: Worked on debugging 
+>>>>>>> 18d454be469f86cde17602b4168dbab7af82d3fa
