@@ -3,10 +3,6 @@
 # Date: Spring 2020
 # Author: Alan Vasilkovsky, Mariah Maninang, Bradley Gallardo, Omar Quinones
 # Assignment: 3
-<<<<<<< HEAD
-
-=======
->>>>>>> fixed kvs DELETE and broadcast
 # Description: This file holds the operations GET, PUT, and DELETE for the key-value-store-view endpoint
 #              as well as the key-value-store endpoint.
 
@@ -44,11 +40,7 @@
 #               by querying other replicas for their key-value stores.
 #
 #
-<<<<<<< HEAD
-
-=======
 ###################
->>>>>>> fixed kvs DELETE and broadcast
 
 from flask import Flask, request, make_response, jsonify, Response
 import os
@@ -64,24 +56,14 @@ requestQueue = {}
 viewVar = os.getenv('VIEW')
 view = viewVar.split(',')
 
-<<<<<<< HEAD
-
-#allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
-def wakeup():
-=======
 #allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
 def wakeup(sender):
->>>>>>> fixed kvs DELETE and broadcast
 
     global key_value_store
     for ip in [i for i in view if i != myIP]:
         try:
             other_kvs = requests.get('http://%s/wake' % ip, timeout=1).json()
 
-<<<<<<< HEAD
-
-=======
->>>>>>> fixed kvs DELETE and broadcast
             #if current key_value_store is not the same as other key_value_store, do this
             if key_value_store != other_kvs:
             
@@ -157,10 +139,6 @@ def broadcast(request):
         url = 'http://{}:8085{}'.format(ip, request.path)
         print(url)
 
-<<<<<<< HEAD
-
-=======
->>>>>>> fixed kvs DELETE and broadcast
     #pings all other replicas to check if any are disconnected or reconnected
     if request.method == 'GET':
         old_view = view
@@ -170,10 +148,7 @@ def broadcast(request):
                 res = requests.get('http://{}/status'.format(ip), headers = request.headers, timeout=1).json()
                 if res is not None and ip not in view:
                     view.append(ip)
-<<<<<<< HEAD
-=======
 
->>>>>>> fixed kvs DELETE and broadcast
 
             except requests.exceptions.Timeout:
                 if ip in view:
@@ -243,10 +218,6 @@ def kvs(key):
 
     sender = request.remote_addr + ":8085"
 
-<<<<<<< HEAD
-
-=======
->>>>>>> fixed kvs DELETE and broadcast
     #gets current view and call wakeup() to see if the replica missed any requests
     if sender not in vectorClock:
         res = requests.get('http://{}/key-value-store-view'.format(myIP), headers = request.headers).json()
