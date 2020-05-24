@@ -3,6 +3,7 @@
 # Date: Spring 2020
 # Author: Alan Vasilkovsky, Mariah Maninang, Bradley Gallardo, Omar Quinones
 # Assignment: 3
+
 # Description: This file holds the operations GET, PUT, and DELETE for the key-value-store-view endpoint
 #              as well as the key-value-store endpoint.
 
@@ -40,7 +41,7 @@
 #               by querying other replicas for their key-value stores.
 #
 #
-###################
+
 
 from flask import Flask, request, make_response, jsonify, Response
 import os
@@ -56,6 +57,7 @@ requestQueue = {}
 viewVar = os.getenv('VIEW')
 view = viewVar.split(',')
 
+
 #allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
 def wakeup():
 
@@ -63,6 +65,7 @@ def wakeup():
     for ip in [i for i in view if i != myIP]:
         try:
             other_kvs = requests.get('http://%s/wake' % ip, timeout=1).json()
+
 
             #if current key_value_store is not the same as other key_value_store, do this
             if key_value_store != other_kvs:
@@ -138,6 +141,7 @@ def broadcast(request):
         url = 'http://{}:8085{}'.format(ip, request.path)
         print(url)
 
+
     #pings all other replicas to check if any are disconnected or reconnected
     if request.method == 'GET':
         old_view = view
@@ -147,7 +151,6 @@ def broadcast(request):
                 res = requests.get('http://{}/status'.format(ip), headers = request.headers, timeout=1).json()
                 if res is not None and ip not in view:
                     view.append(ip)
-
 
             except requests.exceptions.Timeout:
                 if ip in view:
@@ -216,6 +219,7 @@ def kvs(key):
     global view
 
     sender = request.remote_addr + ":8085"
+
 
     #gets current view and call wakeup() to see if the replica missed any requests
     if sender not in vectorClock:
