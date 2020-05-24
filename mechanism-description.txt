@@ -5,6 +5,10 @@ Replica Detection:
 
     Then, we can delete that replica from the view and broadcast a DELETE request to the /key-value-store-view endpoint.
 
+
+    This also allows us to detect a newly active replica as well by pinging a previously unresponsive replica and adding them
+    to the view when we successfully receive a response
+
 Causal Dependency Tracking:
     In order to track causal dependency, we use vector clocks.
 

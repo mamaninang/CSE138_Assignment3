@@ -3,8 +3,45 @@
 # Date: Spring 2020
 # Author: Alan Vasilkovsky, Mariah Maninang, Bradley Gallardo, Omar Quinones
 # Assignment: 3
-# Description: 
-###################
+
+# Description: This file holds the operations GET, PUT, and DELETE for the key-value-store-view endpoint
+#              as well as the key-value-store endpoint.
+
+#              /key-value-store-view
+
+#              If a GET request is made, it will ping the other replicas to see which ones are currently active
+#              and return the view of that given replica.
+#              If a PUT request is made and the socket address doesn't already exist in the view
+#              then the given replica will update it's view and then broadcast a message to update
+#              all the other replicas. Otherwise if the socket-address already exists a 404 bad request will
+#              be returned. 
+#              If a DELETE request is made and the socket-address does exist in the replicas view then it will update
+#              the given replicas view. Then it will broadcast a delete to all the other given replicas.
+#              Otherwise, if the socket-address doesn't exists a 404 bad request will be returned.
+
+#               /key-value-store
+
+#               When a replica receives a GET request for the /key-value-store endpoint, it returns the value and
+#               causal-metadata associated with that key. It returns a 404 status code if the key does not exist.
+
+#               If a PUT request is received, the replica examines the causal metadata passed in. If the causal 
+#               metadata has already been generated, an entry is either added to the key-value store or updated if
+#               the key already exists. If the causal-metadata has not been generated yet, the request will be placed
+#               in a queue. Once the causal-metadata needed is generated, the request will be taken off the queue
+#               and processed.
+#
+#               If a DELETE request is received, the replica returns a success message when the key gets successfully deleted
+#               or an error message if the key does not exist or is already deleted.
+
+#               Whenever a replica receives a PUT or DELETE request from a client, that replica broadcasts the request
+#               to the other running replicas. It knows which other replicas to broadcast to by retrieving
+#               the current view of the active replicas from the /key-value-store-view.
+#
+#               Once a disconnected or removed replica connects to the subnet, it's able to retrieve the requests it missed
+#               by querying other replicas for their key-value stores.
+#
+#
+
 
 from flask import Flask, request, make_response, jsonify, Response
 import os
@@ -20,6 +57,8 @@ requestQueue = {}
 viewVar = os.getenv('VIEW')
 view = viewVar.split(',')
 
+
+#allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
 def wakeup():
 
     global key_value_store
@@ -27,6 +66,8 @@ def wakeup():
         try:
             other_kvs = requests.get('http://%s/wake' % ip, timeout=1).json()
 
+
+            #if current key_value_store is not the same as other key_value_store, do this
             if key_value_store != other_kvs:
             
                 for key in other_kvs:
@@ -61,9 +102,6 @@ def view_operations():
 
 
     elif request.method == 'PUT':
-        old_view = view
-        sender = request.remote_addr + ":8085"
-
         address_to_be_added = request.json['socket-address']
 
         if address_to_be_added in view:
@@ -103,6 +141,8 @@ def broadcast(request):
         url = 'http://{}:8085{}'.format(ip, request.path)
         print(url)
 
+
+    #pings all other replicas to check if any are disconnected or reconnected
     if request.method == 'GET':
         old_view = view
 
@@ -111,7 +151,6 @@ def broadcast(request):
                 res = requests.get('http://{}/status'.format(ip), headers = request.headers, timeout=1).json()
                 if res is not None and ip not in view:
                     view.append(ip)
-                    # send_missed_requests()
 
             except requests.exceptions.Timeout:
                 if ip in view:
@@ -181,6 +220,8 @@ def kvs(key):
 
     sender = request.remote_addr + ":8085"
 
+
+    #gets current view and call wakeup() to see if the replica missed any requests
     if sender not in vectorClock:
         res = requests.get('http://{}/key-value-store-view'.format(myIP), headers = request.headers).json()
         view = res["view"]
