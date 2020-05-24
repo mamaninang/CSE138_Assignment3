@@ -3,7 +3,10 @@
 # Date: Spring 2020
 # Author: Alan Vasilkovsky, Mariah Maninang, Bradley Gallardo, Omar Quinones
 # Assignment: 3
+<<<<<<< HEAD
 
+=======
+>>>>>>> fixed kvs DELETE and broadcast
 # Description: This file holds the operations GET, PUT, and DELETE for the key-value-store-view endpoint
 #              as well as the key-value-store endpoint.
 
@@ -41,7 +44,11 @@
 #               by querying other replicas for their key-value stores.
 #
 #
+<<<<<<< HEAD
 
+=======
+###################
+>>>>>>> fixed kvs DELETE and broadcast
 
 from flask import Flask, request, make_response, jsonify, Response
 import os
@@ -57,16 +64,24 @@ requestQueue = {}
 viewVar = os.getenv('VIEW')
 view = viewVar.split(',')
 
+<<<<<<< HEAD
 
 #allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
 def wakeup():
+=======
+#allows a disconnected or removed replica to retrieve the requests it missed during its disconnection
+def wakeup(sender):
+>>>>>>> fixed kvs DELETE and broadcast
 
     global key_value_store
     for ip in [i for i in view if i != myIP]:
         try:
             other_kvs = requests.get('http://%s/wake' % ip, timeout=1).json()
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> fixed kvs DELETE and broadcast
             #if current key_value_store is not the same as other key_value_store, do this
             if key_value_store != other_kvs:
             
@@ -82,9 +97,10 @@ def wakeup():
 
                         key_value_store[key] = other_kvs[key]
                         key_value_store[key]["causal-metadata"][myIP] += 1
+
                         vectorClock[myIP] += 1
 
-                    # update_other_replica_vc()
+                update_other_replica_vc(sender)
 
             return
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -141,7 +157,10 @@ def broadcast(request):
         url = 'http://{}:8085{}'.format(ip, request.path)
         print(url)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> fixed kvs DELETE and broadcast
     #pings all other replicas to check if any are disconnected or reconnected
     if request.method == 'GET':
         old_view = view
@@ -151,6 +170,10 @@ def broadcast(request):
                 res = requests.get('http://{}/status'.format(ip), headers = request.headers, timeout=1).json()
                 if res is not None and ip not in view:
                     view.append(ip)
+<<<<<<< HEAD
+=======
+
+>>>>>>> fixed kvs DELETE and broadcast
 
             except requests.exceptions.Timeout:
                 if ip in view:
@@ -220,13 +243,16 @@ def kvs(key):
 
     sender = request.remote_addr + ":8085"
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> fixed kvs DELETE and broadcast
     #gets current view and call wakeup() to see if the replica missed any requests
     if sender not in vectorClock:
         res = requests.get('http://{}/key-value-store-view'.format(myIP), headers = request.headers).json()
         view = res["view"]
 
-        wakeup()
+        wakeup(sender)
 
 
     if request.method == 'GET':
@@ -243,7 +269,6 @@ def kvs(key):
     if request.method == 'PUT':
 
         causal = request.json["causal-metadata"]
-        value = request.json
 
         keyAlreadyExists = True if key in key_value_store else False
 
@@ -271,8 +296,11 @@ def kvs(key):
                     vectorClock[myIP] += 1
 
         key_value_store[key]["causal-metadata"] = vectorClock
+        value = key_value_store[key]
+
         kvs_broadcast(sender, key, value, request.method)
         update_other_replica_vc(sender)
+        
 
         #check requests on hold
         if requestQueue != {}:
@@ -297,15 +325,16 @@ def kvs(key):
             return make_response('{"doesExist":false,"error":"Key does not exist","message":"Error in DELETE"}', 404)
 
         elif causal[myIP] > vectorClock[myIP]:
-            requestQueue[key] = request.json
+            requestQueue[key]["value"] = None
+            requestQueue[key]["causal-metadata"] = request.json["causal-metadata"]
             requestQueue[key]["method"] = request.method
             return make_response('{"message": "Request placed in a queue", "request": %s}' % json.dumps(requestQueue[key]), 200)
 
-        elif key_value_store[key] is None:
+        elif key_value_store[key]["value"] is None:
             return make_response('{"doesExist":false,"error":"Key already deleted","message":"Error in DELETE"}', 404)
 
         else:
-            key_value_store[key] = None
+            key_value_store[key]["value"] = None
 
             #takes max value of each element if sender is a replica and adds 1 to own position
             if sender not in vectorClock:
@@ -315,6 +344,8 @@ def kvs(key):
                 vectorClock[myIP] += 1
 
             key_value_store[key]["causal-metadata"] = vectorClock
+            value = key_value_store[key]
+
             kvs_broadcast(sender, key, value, request.method)
             update_other_replica_vc(sender)
 
@@ -336,19 +367,19 @@ def checkRequestQueue():
         causal = requestQueue[key]["causal-metadata"]
         if causal[myIP] <= vectorClock[myIP]:
 
+            sender = request.remote_addr + ":8085"
+            
+            key_value_store[key] = requestQueue[key]
+            key_value_store[key]["causal-metadata"] = vectorClock
+
             if requestQueue[key]["method"] == 'PUT':
-                key_value_store[key] = requestQueue[key]
                 method = 'PUT'
 
             elif requestQueue[key]["method"] == 'DELETE':
-                key_value_store[key] = None
                 method = 'DELETE'
 
-            sender = request.remote_addr + ":8085"
             value = key_value_store[key]
-
             del requestQueue[key]
-            vectorClock[myIP] += 1
             kvs_broadcast(sender, key, value, method)
 
             return False
@@ -369,7 +400,6 @@ def kvs_broadcast(sender, key, value, method):
             if ip != myIP:
 
                 address = "http://" + ip + "/key-value-store/" + key
-                value["causal-metadata"] = vectorClock
 
                 if method == 'PUT':
                     response = requests.put(address, headers=request.headers, json=value)
@@ -388,14 +418,14 @@ def update_other_replica_vc(sender):
 
         for ip in ip_to_get_vc:
             requests.put('http://{}/send-vc'.format(ip), headers = request.headers, json = {"vector-clock": vectorClock})
-    return
+    return 'OK'
 
 
 @app.route('/send-vc', methods = ['PUT'])
 def send_vc():
     other_vc = request.json["vector-clock"]
     takeMaxElement(other_vc)
-    return
+    return 'OK'
 
 @app.route('/status', methods = ['GET'])
 def status():
