@@ -24,4 +24,4 @@ EXPOSE 8085
 
 ENTRYPOINT [ "python3" ]
 
-CMD [ "test.py" ]
+CMD [ "app.py" ]
