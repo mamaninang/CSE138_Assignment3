@@ -16,3 +16,5 @@ In order to provide replication, each replica that receives a write operation (P
 ## Replica Detection Mechanism
 
 In the /key-value-store-view, a broadcast method is called whenever a GET request is received. This broadcast method is responsible for pinging all the possible replicas to create an updated view of all active replicas. If a response is received, the replica either remains or gets added to the current view. If no response is received within a given period of time, the replica is deleted from the view.
+
+This project is accomplished by using Python, Flask and Docker
