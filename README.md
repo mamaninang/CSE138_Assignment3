@@ -1,4 +1,4 @@
-# CSE138_Assignment3
+# REST API
 
 A REST API that consists of two main endpoints namely /key-value-store, which receives requests directly from the client, and /key-value-store-view, which only receives requests sent from other replicas.
 
