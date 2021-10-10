@@ -1,6 +1,6 @@
-# REST API
+# Distributed Database
 
-A REST API that consists of two main endpoints namely /key-value-store, which receives requests directly from the client, and /key-value-store-view, which only receives requests sent from other replicas.
+This Distributed Database can be interacted with by sending read or write requests to its REST API that consists of two main endpoints namely /key-value-store, which receives requests directly from the client, and /key-value-store-view, which only receives requests sent from other replicas.
 
 /key-value-store receives GET, PUT or DELETE requests from the client in order to access data, add an entry or modify an entry in the key-value store.
 /key-value-store-view mainly receives requests from the /key-value-store endpoint and returns the most current view of the active replicas
